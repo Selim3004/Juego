@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retos GLUP - Automático</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffebee;
+            color: #333;
+        }
+        h1 {
+            color: #d32f2f;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .result-section {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            border: 3px solid #d32f2f;
+            border-radius: 10px;
+            background-color: #fff;
+            min-height: 150px;
+        }
+        button {
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            display: block;
+            margin: 20px auto;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #b71c1c;
+            transform: scale(1.05);
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .challenge-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d32f2f;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .challenge-desc {
+            font-size: 18px;
+            line-height: 1.6;
+            text-align: center;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 16px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .loading {
+            background-color: #fff8e1;
+            color: #ff8f00;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #d32f2f;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RETOS GLUP</h1>
+        <div id="status" class="status loading">
+            <span class="spinner"></span> Buscando archivo Rts.xlsx...
+        </div>
+        
+        <button id="randomBtn" disabled>OBTENER RETO ALEATORIO</button>
+        
+        <div class="result-section" id="resultSection">
+            <div class="challenge-title" id="challengeTitle"></div>
+            <div class="challenge-desc" id="challengeDesc"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración - Cambia esto si es necesario
+        const EXCEL_FILENAME = 'Rts.xlsx';  // Nombre exacto de tu archivo
+        const TITLE_COLUMN = 0;             // Columna A (0) para los títulos
+        const DESC_COLUMN = 1;              // Columna B (1) para descripciones
+        const HEADER_ROWS = 1;              // Filas de encabezado a ignorar
+        
+        let challenges = [];
+        
+        // Función para cargar el Excel automáticamente
+        async function loadExcelAutomatically() {
+            try {
+                const response = await fetch(EXCEL_FILENAME);
+                
+                if (!response.ok) {
+                    throw new Error(`No se encontró el archivo "${EXCEL_FILENAME}"`);
+                }
+                
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                
+                // Procesar datos (ignorar filas de encabezado)
+                challenges = jsonData.slice(HEADER_ROWS)
+                    .filter(row => row[TITLE_COLUMN])  // Filtrar filas vacías
+                    .map(row => ({
+                        title: row[TITLE_COLUMN] || "Sin título",
+                        description: row[DESC_COLUMN] || "Sin descripción"
+                    }));
+                
+                if (challenges.length > 0) {
+                    document.getElementById('status').className = 'status success';
+                    document.getElementById('status').innerHTML = 
+                        `✅ Se cargaron ${challenges.length} retos desde <strong>${EXCEL_FILENAME}</strong>`;
+                    document.getElementById('randomBtn').disabled = false;
+                } else {
+                    throw new Error("El archivo no contiene retos válidos");
+                }
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = `
+                    ❌ Error: <strong>${error.message}</strong><br><br>
+                    Asegúrate de que:<br>
+                    1. El archivo <strong>"${EXCEL_FILENAME}"</strong> está en la misma carpeta que esta página<br>
+                    2. El nombre del archivo es exactamente igual (incluyendo mayúsculas)<br>
+                    3. Tiene la estructura correcta (columna A: títulos, columna B: descripciones)
+                `;
+                console.error("Error al cargar el Excel:", error);
+            }
+        }
+        
+        // Cargar el Excel cuando se abra la página
+        window.addEventListener('DOMContentLoaded', loadExcelAutomatically);
+        
+        // Botón para obtener reto aleatorio
+        document.getElementById('randomBtn').addEventListener('click', function() {
+            if (challenges.length === 0) return;
+            
+            const randomIndex = Math.floor(Math.random() * challenges.length);
+            const selectedChallenge = challenges[randomIndex];
+            
+            document.getElementById('challengeTitle').textContent = selectedChallenge.title;
+            document.getElementById('challengeDesc').textContent = selectedChallenge.description;
+            document.getElementById('resultSection').style.display = 'block';
+            
+            // Efecto visual
+            this.textContent = "¡NUEVO RETO!";
+            setTimeout(() => {
+                this.textContent = "OBTENER RETO ALEATORIO";
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
